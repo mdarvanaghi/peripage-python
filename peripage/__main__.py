@@ -52,7 +52,7 @@ def main():
         type=str,
         required=True
     )
-
+    
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument(
         '-t', '--text',
@@ -140,7 +140,7 @@ def main():
         try:
             img = PIL.Image.open(args.image)
         except:
-            print(f'Failed to open image { args.image }')
+            print(f'Failed to open image {args.image}')
 
         printer.printImage(img)
 
@@ -167,6 +167,7 @@ def main():
     else:
 
         print('How did you get there?')
+
 
 if __name__ == '__main__':
     main()

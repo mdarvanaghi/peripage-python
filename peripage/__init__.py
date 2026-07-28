@@ -15,21 +15,21 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 
+import time
+import qrcode
+import typing
+import enum
+import PIL.Image
+import PIL.ImageOps
+
+from .transport import Transport, BleakTransport
+
+
 __title__ = 'Peripage buetooth printing utility'
 __version__ = '1.2'
 __author__ = 'bitrate16'
 __license__ = 'GPLv3'
 __copyright__ = 'Copyright (c) GPLv3 2021-2023 bitrate16 (pegasko)'
-
-
-import time
-import qrcode
-import typing
-import enum
-import bluetooth
-
-import PIL.Image
-import PIL.ImageOps
 
 
 class PrinterTypeSpecs:
@@ -47,6 +47,7 @@ class PrinterTypeSpecs:
         self.row_bytes = row_bytes
         self.row_width = row_width
         self.row_characters = row_characters
+
 
 class PrinterType(enum.Enum):
     """
@@ -91,6 +92,7 @@ class PrinterType(enum.Enum):
 
     def __init__(self, spec: PrinterTypeSpecs):
         self.spec = spec
+
 
 class Printer:
     """
@@ -148,16 +150,15 @@ class Printer:
         # buffer used for continuous printing with line wrapping
         self.print_buffer = ''
 
+        # Initialize transport (now only BLE supported)
+        self.transport = BleakTransport(mac, timeout)
+
     def isConnected(self) -> bool:
         """
         Check if printer is connected (socket alive)
         """
 
-        try:
-            self.sock.getpeername()
-            return True
-        except:
-            return False
+        return self.transport.is_connected()
 
     def connect(self) -> None:
         """
@@ -169,9 +170,7 @@ class Printer:
         `reset()` after connecting.
         """
 
-        self.sock = bluetooth.BluetoothSocket(bluetooth.RFCOMM)
-        self.sock.connect((self.mac, 1))
-        self.sock.settimeout(self.timeout)
+        self.transport.connect()
 
     def reconnect(self) -> None:
         """
@@ -182,13 +181,9 @@ class Printer:
         """
 
         if self.isConnected():
-            # self.sock.shutdown(socket.SHUT_RDWR)
-            self.sock.close()
-            del self.sock
+            self.transport.disconnect()
 
-        self.sock = bluetooth.BluetoothSocket(bluetooth.RFCOMM)
-        self.sock.connect((self.mac, 1))
-        self.sock.settimeout(self.timeout)
+        self.transport.connect()
 
     def disconnect(self) -> None:
         """
@@ -196,9 +191,7 @@ class Printer:
         """
 
         if self.isConnected():
-            # self.sock.shutdown(socket.SHUT_RDWR)
-            self.sock.close()
-            del self.sock
+            self.transport.disconnect()
 
     def setTimeout(self, timeout) -> None:
         """
@@ -206,8 +199,7 @@ class Printer:
         """
 
         self.timeout = timeout
-        if self.isConnected():
-            self.sock.settimeout(timeout)
+        self.transport.set_timeout(timeout)
 
     def tellPrinter(self, byteseq: bytes) -> None:
         """
@@ -217,7 +209,7 @@ class Printer:
         * `byteseq` - `bytes` data
         """
 
-        self.sock.send(byteseq)
+        self.transport.write(byteseq)
 
     def askPrinter(self, byteseq: bytes, recv_size: int=1024) -> bytes:
         """
@@ -228,8 +220,8 @@ class Printer:
         * `byteseq` - `bytes` data
         """
 
-        self.sock.send(byteseq)
-        return self.sock.recv(recv_size)
+        self.transport.write(byteseq)
+        return self.transport.read(recv_size)
 
     def listenPrinter(self, recv_size: int=1024) -> bytes:
         """
@@ -239,7 +231,7 @@ class Printer:
         * `recv_size` - max size of received chunk
         """
 
-        return self.sock.recv(recv_size)
+        return self.transport.read(recv_size)
 
     def tellPrinterSeq(self, byteseq: typing.Iterable[bytes]) -> None:
         """
@@ -250,7 +242,7 @@ class Printer:
         """
 
         for s in byteseq:
-            self.sock.send(s)
+            self.transport.write(s)
 
     def askPrinterSeq(self, byteseq: typing.Iterable[bytes], recv_size: int=1024) -> bytes:
         """
@@ -262,8 +254,8 @@ class Printer:
         """
 
         for s in byteseq:
-            self.sock.send(s)
-        return self.sock.recv(recv_size)
+            self.transport.write(s)
+        return self.transport.read(recv_size)
 
     def getDeviceIP(self) -> bytes:
         """
