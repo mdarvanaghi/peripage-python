@@ -26,12 +26,27 @@ from . import print_service
 # Config
 PRINTER_MODEL = peripage.PrinterType.A6p
 PRINTER_MAC   = '00:15:83:15:bc:5f'
+PRINTER_TIMEOUT = 1.0
 SERVER_PORT   = 11001
 BREAK_SIZE    = 100
 TIMEZONE      = 'Europe/Moscow'
 SECRET_KEY    = '1234567890'
 RECEIVE_DIRECTORY = 'received'
 MAX_FILE_SIZE = 10 * 1024 * 1024
+
+# This demo defaults to classic Bluetooth (SocketTransport), matching the
+# original A6/A6+/A40/A40+ setup. For a BLE printer like the P21, swap this
+# for:
+#   from peripage.transport import BleakTransport
+#   PRINTER_TRANSPORT = BleakTransport(
+#       address='AA:BB:CC:DD:EE:FF',
+#       write_characteristic='0000ff02-0000-1000-8000-00805f9b34fb',
+#       notify_characteristic='0000ff01-0000-1000-8000-00805f9b34fb',
+#   )
+# (run `python -m peripage discover scan` / `discover services <address>`
+# to find your printer's address and characteristic UUIDs)
+from peripage.transport import SocketTransport
+PRINTER_TRANSPORT = SocketTransport(PRINTER_MAC, timeout=PRINTER_TIMEOUT)
 
 
 # Globals
@@ -228,7 +243,7 @@ def main():
     # Init printing service
     global service
     service = print_service.PrintService(60, 1, 5)
-    service.start(PRINTER_MAC, PRINTER_MODEL)
+    service.start(PRINTER_TRANSPORT, PRINTER_MODEL)
 
     # Attach routes
     app.router.add_post('/print_ascii', post_print_ascii)

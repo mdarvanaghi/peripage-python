@@ -1,0 +1,4 @@
+# Only needed if you use SocketTransport (classic Bluetooth: A6/A6+/A40/A40+).
+# Not needed for BLE printers like the P21.
+-r requirements.txt
+PyBluez @ git+https://github.com/pybluez/pybluez@master#egg=pybluez

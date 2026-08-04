@@ -14,37 +14,18 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+from peripage.transport.base import Transport
+from peripage.transport.socket_transport import SocketTransport
+from peripage.transport.fake_transport import FakeTransport
 
-__title__ = 'Peripage bluetooth printing utility'
-__version__ = '2.0'
-__author__ = 'bitrate16'
-__license__ = 'GPLv3'
-__copyright__ = 'Copyright (c) GPLv3 2021-2023 bitrate16 (pegasko)'
-
-# Public API re-exports.
-#
-# `peripage.__init__` used to *be* the protocol implementation, tightly
-# coupled to a PyBluez classic-Bluetooth socket. That logic now lives in
-# `peripage.protocol` and talks to a `peripage.transport.Transport`
-# instead, so the same protocol can run over classic Bluetooth
-# (`SocketTransport`) or BLE (`BleakTransport`). This file just keeps the
-# top-level `import peripage; peripage.Printer(...)` usage working.
-
-from peripage.protocol import PrinterTypeSpecs, PrinterType, Printer
-from peripage.transport import Transport, SocketTransport, FakeTransport
-
-__all__ = [
-    'PrinterTypeSpecs',
-    'PrinterType',
-    'Printer',
-    'Transport',
-    'SocketTransport',
-    'FakeTransport',
-    'BleakTransport',
-]
+__all__ = ['Transport', 'SocketTransport', 'FakeTransport', 'BleakTransport']
 
 
 def __getattr__(name):
+    # `bleak` is an optional dependency (only needed for BLE printers like
+    # the P21), so it's imported lazily here rather than at module load
+    # time. `from peripage.transport import BleakTransport` still works;
+    # it just defers the `bleak` import until the name is actually used.
     if name == 'BleakTransport':
         from peripage.transport.ble_transport import BleakTransport
         return BleakTransport

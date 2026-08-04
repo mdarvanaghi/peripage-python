@@ -9,6 +9,7 @@ import threading
 import PIL
 
 import peripage
+from peripage.transport import Transport, SocketTransport
 
 
 class Repeat():
@@ -104,9 +105,22 @@ class PrintService:
 		# Indicate service failture
 		self.service_failture = True
 
-	def start(self, printer_mac: str, printer_type: peripage.PrinterType, timeout: float = 1.0, concentration: int = 1):
+	def start(self, transport: Transport, printer_type: peripage.PrinterType, concentration: int = 1):
 		"""
-		Perform startup oof the service without check for previous instance running.
+		Perform startup of the service without check for previous instance
+		running.
+
+		Arguments:
+		* `transport` - a `peripage.transport.Transport` instance (e.g.
+		  `SocketTransport(mac, timeout=...)` for classic Bluetooth printers
+		  like the A6/A6+/A40/A40+, or `BleakTransport(address,
+		  write_characteristic=..., notify_characteristic=...)` for BLE
+		  printers like the P21). The service owns this transport for its
+		  entire lifetime - reconnects reuse the same instance via
+		  `transport.reconnect()`.
+		* `printer_type` - the `peripage.PrinterType` of the printer.
+		* `concentration` - print concentration/temperature applied on
+		  every (re)connect.
 		"""
 
 		def service_handler():
@@ -120,9 +134,14 @@ class PrintService:
 					if not self.printer.isConnected():
 						raise RuntimeError('not connected')
 
-					# Windows workaround
+					# Windows workaround: on some Windows PyBluez builds,
+					# calling .listen() on a stalled RFCOMM socket nudges it
+					# back into a state where recv()/send() behave
+					# correctly. This only applies to classic-Bluetooth
+					# connections (SocketTransport) - it's a no-op for BLE.
 					try:
-						self.printer.sock.listen()
+						if isinstance(self.printer.transport, SocketTransport) and self.printer.transport.sock is not None:
+							self.printer.transport.sock.listen()
 					except:
 						pass
 
@@ -180,7 +199,7 @@ class PrintService:
 						pass
 
 		self.concentration = concentration
-		self.printer = peripage.Printer(printer_mac, printer_type, timeout)
+		self.printer = peripage.Printer(transport, printer_type)
 		self.last_ping_timestamp = time.time()
 		self.events = []
 		self.service = Repeat(self.event_interval, service_handler)

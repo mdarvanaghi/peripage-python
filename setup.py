@@ -1,8 +1,12 @@
-from setuptools import setup
+from setuptools import setup, find_packages
 
 setup(
     name = 'peripage',
-    packages = ['peripage'],
+    packages = find_packages(include=['peripage', 'peripage.*']),
+    package_data = {
+        'peripage': ['fonts/*.ttf', 'fonts/LICENSE.txt'],
+    },
+    include_package_data = True,
     version = '1.2',
     license='MIT',
     description = 'Utility for printing on Peripage printers via bluetooth',
@@ -11,11 +15,14 @@ setup(
     url = 'https://github.com/bitrate16/peripage-python',
     keywords = ['PERIPAGE', 'BLUETOOTH', 'THERMAL PRINTER', 'PRINTER'],
     install_requires=[
-        'PyBluez>=0.23',
         'Pillow>=8.2.0',
-        'argparse>=1.1',
         'qrcode>=6.1',
+        'typer>=0.9.0',
     ],
+    extras_require={
+        'classic': ['PyBluez>=0.23'],
+        'ble': ['bleak>=0.20.0'],
+    },
     classifiers=[
         'Development Status :: 5 - Production/Stable',      # Chose either "3 - Alpha", "4 - Beta" or "5 - Production/Stable" as the current state of your package
         'Intended Audience :: Developers',
@@ -31,7 +38,7 @@ setup(
     ],
     entry_points={
         'console_scripts': [
-            'peripage = peripage.__main__:main'
+            'peripage = peripage.cli:main'
         ]
     }
 )

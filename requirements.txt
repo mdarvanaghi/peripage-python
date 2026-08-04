@@ -1,4 +1,4 @@
+# Core - required regardless of which transport you use.
 Pillow>=8.2.0
-argparse>=1.1
-PyBluez @ git+https://github.com/pybluez/pybluez@master#egg=pybluez
 qrcode>=6.1
+typer>=0.9.0
