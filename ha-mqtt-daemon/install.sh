@@ -250,12 +250,54 @@ set_env_var() {
     mv "$tmp" "$file"
 }
 
+# run_ble_discovery NAME_FILTER - scans for a nearby BLE device matching
+# NAME_FILTER and walks its GATT table for write/notify characteristics,
+# by calling discovery._scan_and_pick() directly (the exact same function
+# the daemon itself calls at startup for auto-discovery) - so a successful
+# result here is guaranteed to behave identically at runtime, and any
+# failure here (e.g. the BlueZ "br-connection-profile-unavailable" quirk on
+# a device's first-ever programmatic connect) surfaces immediately, during
+# a one-shot interactive install, instead of buried in a systemd crash loop.
+# Prints "OK\t<address>\t<write_uuid>\t<notify_uuid-or-empty>" on success
+# (only that line goes to stdout - progress/warnings go to stderr, so
+# capturing this with `$(...)` gets a clean, parseable result). Values are
+# passed to the child process via environment variables, not interpolated
+# into the Python source, so a name filter containing shell/Python-special
+# characters can't break or inject into the script.
+run_ble_discovery() {
+    local name_filter="$1"
+    NAME_FILTER="$name_filter" INSTALL_DIR="$INSTALL_DIR" "$INSTALL_DIR/.venv/bin/python" - <<'PYEOF'
+import asyncio
+import logging
+import os
+import sys
+
+logging.basicConfig(level=logging.INFO)
+
+sys.path.insert(0, os.path.join(os.environ['INSTALL_DIR'], 'ha-mqtt-daemon'))
+sys.path.insert(0, os.environ['INSTALL_DIR'])
+import discovery
+
+try:
+    address, write_uuid, notify_uuid = asyncio.run(
+        discovery._scan_and_pick(os.environ['NAME_FILTER'], 5.0, 10.0)
+    )
+    if not write_uuid:
+        print('No write characteristic found on that device.', file=sys.stderr)
+        sys.exit(1)
+    print(f'OK\t{address}\t{write_uuid}\t{notify_uuid or ""}')
+except Exception as e:
+    print(f'{type(e).__name__}: {e}', file=sys.stderr)
+    sys.exit(1)
+PYEOF
+}
+
 if [ "$env_file_is_new" -eq 1 ] && [ "$NON_INTERACTIVE" -eq 0 ] && have_tty; then
     echo
     echo "==> Configuring $ENV_FILE (press Enter to accept the [default])"
     echo
 
-    printer_type="" printer_transport="" mac="" ble_address=""
+    printer_type="" printer_transport="" mac="" ble_address="" ble_write_uuid="" ble_notify_uuid=""
     mqtt_host="" mqtt_port="" mqtt_user="" mqtt_pass="" device_name="" concentration=""
 
     while true; do
@@ -280,7 +322,29 @@ if [ "$env_file_is_new" -eq 1 ] && [ "$NON_INTERACTIVE" -eq 0 ] && have_tty; the
             echo "Required for classic Bluetooth printers." >&2
         done
     else
-        prompt ble_address "BLE address (blank = auto-discover by scanning for a nearby 'PPG' device)"
+        do_discover=""
+        prompt do_discover "Auto-discover BLE address + GATT UUIDs now? (requires printer powered on and nearby)" "Y"
+        case "$do_discover" in
+            [Nn]*)
+                prompt ble_address "BLE address (blank = auto-discover at runtime instead)"
+                ;;
+            *)
+                name_filter=""
+                prompt name_filter "BLE name filter to scan for" "PPG"
+                echo
+                echo "==> Power on the printer now, then press Enter to scan (connects once - can take up to 15s) ..."
+                read -r _ < /dev/tty
+                if scan_result="$(run_ble_discovery "$name_filter")"; then
+                    IFS=$'\t' read -r _ ble_address ble_write_uuid ble_notify_uuid <<< "$scan_result"
+                    echo "==> Found printer at $ble_address (write=$ble_write_uuid${ble_notify_uuid:+, notify=$ble_notify_uuid})"
+                else
+                    echo "==> Discovery failed - leaving BLE address/UUIDs unset. The daemon will retry" >&2
+                    echo "    auto-discovery itself at startup, or set PRINTER_BLE_ADDRESS/PRINTER_BLE_WRITE_UUID" >&2
+                    echo "    manually in $ENV_FILE afterwards." >&2
+                    ble_address="" ble_write_uuid="" ble_notify_uuid=""
+                fi
+                ;;
+        esac
     fi
 
     prompt mqtt_host "MQTT broker host" "localhost"
@@ -310,6 +374,8 @@ if [ "$env_file_is_new" -eq 1 ] && [ "$NON_INTERACTIVE" -eq 0 ] && have_tty; the
     set_env_var "$ENV_FILE" PRINTER_TRANSPORT "$printer_transport"
     [ -n "$mac" ] && set_env_var "$ENV_FILE" PRINTER_MAC "$mac"
     [ -n "$ble_address" ] && set_env_var "$ENV_FILE" PRINTER_BLE_ADDRESS "$ble_address"
+    [ -n "$ble_write_uuid" ] && set_env_var "$ENV_FILE" PRINTER_BLE_WRITE_UUID "$ble_write_uuid"
+    [ -n "$ble_notify_uuid" ] && set_env_var "$ENV_FILE" PRINTER_BLE_NOTIFY_UUID "$ble_notify_uuid"
     set_env_var "$ENV_FILE" MQTT_HOST "$mqtt_host"
     set_env_var "$ENV_FILE" MQTT_PORT "$mqtt_port"
     [ -n "$mqtt_user" ] && set_env_var "$ENV_FILE" MQTT_USERNAME "$mqtt_user"

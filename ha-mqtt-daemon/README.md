@@ -77,6 +77,21 @@ host/port/credentials, concentration) and writes them straight into
 (checked with the daemon's own config loader, not just "non-empty"), **the
 service starts automatically** - no separate "now start it" step.
 
+For BLE printers (P21), the installer also offers to **auto-discover the
+address and GATT write/notify UUIDs right there during install** (default
+Y - it'll ask you to power the printer on first, then connects once to read
+its GATT table). If that succeeds, all three get pinned into
+`peripage-ha.env` up front, so the daemon never needs to scan-and-connect
+for discovery again on future restarts - it just uses the pinned values
+directly. This also front-loads the riskiest part of BLE setup (the very
+first programmatic connect to a never-before-paired device, which is where
+BlueZ's `br-connection-profile-unavailable` quirk tends to show up) into a
+one-shot interactive step where a failure is immediately visible, instead of
+a systemd crash-loop. If discovery fails or you decline it, the daemon falls
+back to auto-discovering at startup as before (or you can fill in
+`PRINTER_BLE_ADDRESS`/`PRINTER_BLE_WRITE_UUID`/`PRINTER_BLE_NOTIFY_UUID`
+manually afterwards).
+
 No terminal attached (e.g. piped from something that isn't an interactive
 shell), or you'd rather configure it yourself? Pass `--non-interactive` and
 it leaves `peripage-ha.env` at the example's blanks:
