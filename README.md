@@ -326,6 +326,15 @@ image.save('ruler.png')
 
 ```
 
+## Home Assistant
+
+For a printer wired into Home Assistant (auto-discovered, no manual entity
+config) rather than driven from scripts, see [`ha-mqtt-daemon/`](ha-mqtt-daemon/README.md) -
+a long-running daemon that auto-discovers a BLE printer (P21), registers
+itself with HA via MQTT Discovery, and exposes a text-to-print entity,
+battery sensor, and feed button. Includes a one-line installer
+(`curl ... | sudo bash`) that sets it up as a systemd service.
+
 ## Print Service
 
 **Print 50 text tasks on A6+ (classic Bluetooth)**

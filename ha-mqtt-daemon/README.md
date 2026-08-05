@@ -172,10 +172,87 @@ docker compose logs -f
 
 ## Entities
 
-- `text.print_text` - send text to be printed.
-- `sensor.battery` - battery percentage.
-- `button.feed` - feed some blank paper (handy for testing the connection).
+- **Print text** (`text` entity) - send text to be printed.
+- **Battery** (`sensor` entity) - battery percentage.
+- **Feed** (`button` entity) - feed some blank paper (handy for testing the connection).
 
-All entities share one HA device card and use the standard
+All three share one HA device card and use the standard
 `availability_topic`/LWT mechanism to grey out when the daemon or MQTT
-connection drops - there is no separate "online" entity.
+connection drops - there is no separate "online" entity. Exact entity IDs
+(e.g. `text.print_text` vs `text.peripage_p21_print_text`) depend on how HA
+slugifies the name on first discovery, particularly if you run more than one
+of these daemons - check the device page (next section) rather than assuming.
+
+## Adding the printer to Home Assistant
+
+This daemon relies entirely on HA's [MQTT Discovery](https://www.home-assistant.io/integrations/mqtt/#mqtt-discovery) -
+there's no manual entity YAML to write. Once it's running and talking to the
+right broker, the printer just appears.
+
+**1. Prerequisite: HA's MQTT integration must already be set up**, pointed at
+the *same broker* this daemon uses (`MQTT_HOST`/`MQTT_PORT` in your
+`peripage-ha.env`). If it isn't yet: Home Assistant → **Settings → Devices &
+Services → Add Integration → MQTT**, enter your broker's host/port/credentials.
+Discovery is on by default with prefix `homeassistant`, matching this
+daemon's default `HA_DISCOVERY_PREFIX` - if you changed one, change the other
+to match.
+
+**2. Start the daemon** (see Install sections above) and confirm it actually
+connected:
+```
+journalctl -u peripage-ha -f
+```
+You should see it connect to MQTT and, if using BLE auto-discovery, log which
+device it picked. If `PRINTER_TYPE`/`PRINTER_MAC` (classic) aren't set yet,
+it'll fail fast with a clear error - fill in `peripage-ha.env` and restart:
+```
+sudo systemctl restart peripage-ha
+```
+
+**3. Check Home Assistant** - within a few seconds, go to **Settings →
+Devices & Services → Devices** and look for a device named after
+`HA_DEVICE_NAME` (default `Peripage <type>`, e.g. "Peripage P21"). Open it -
+you should see the three entities (Print text, Battery, Feed) listed, all
+showing as available (not greyed out) as soon as the daemon is running and
+connected to MQTT - see point 6 below for what availability does and
+doesn't tell you about the printer itself.
+
+If the device doesn't show up: confirm HA's MQTT integration is connected
+(same Settings → Devices & Services page, check the MQTT integration's own
+status), and that the daemon's logs show a successful MQTT connect. You can
+also watch the discovery messages arrive directly, from any machine that can
+reach the broker:
+```
+mosquitto_sub -h <broker> -t 'homeassistant/#' -v
+```
+(retained messages replay immediately on subscribe, so you'll see them even
+if the daemon started earlier).
+
+**4. Try it** - open the device page and click into **Print text**. Typing a
+value and pressing enter sends it straight to the printer. Click **Feed** to
+feed some blank paper. **Battery** updates every `BATTERY_POLL_INTERVAL`
+seconds (default 300s/5min) - don't expect it to jump immediately after
+startup.
+
+**5. Automate it** - once you know the entity ID (from the device page, or
+**Developer Tools → States**), call it like any other `text`/`button`
+entity, e.g. an automation action:
+```yaml
+action: text.set_value
+target:
+  entity_id: text.print_text   # substitute your actual entity id
+data:
+  value: "Good morning!"
+```
+or from a script/automation calling `button.press` on the feed entity the
+same way.
+
+**6. If something's greyed out** - the `availability_topic`/LWT mechanism
+reflects whether the *daemon process* is running and connected to MQTT (via
+its LWT + a clean-shutdown "offline" publish). It does **not** currently
+reflect whether the printer itself is connected - `PrintService` handles
+printer reconnects internally (with its own backoff) and the entities stay
+"available" throughout, even while it's retrying. If prints aren't going
+through but nothing's greyed out, check `journalctl -u peripage-ha` for
+printer-side connection/reconnect messages - that's the only place printer
+health currently surfaces.
