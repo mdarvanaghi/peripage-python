@@ -48,17 +48,24 @@ logger = logging.getLogger('ha-mqtt-daemon')
 
 
 def _connect_transport_with_retry(cfg: config_module.Config):
+    # Catches more than discovery.DiscoveryError deliberately: a failed BLE
+    # GATT connect during auto-pick (bleak/BlueZ raising e.g. BleakDBusError,
+    # BleakError, or a plain OSError) is just as transient/retryable as "no
+    # matching device found" - letting those escape here means this retry
+    # loop does nothing for them and the whole process crashes instead,
+    # relying on systemd to restart it every RestartSec instead of retrying
+    # in-process with our own backoff/logging.
     attempt = 0
     while True:
         attempt += 1
         try:
             return discovery.build_transport(cfg)
-        except discovery.DiscoveryError as e:
+        except Exception as e:
             if attempt >= cfg.discovery_retry_attempts:
                 raise
             logger.warning(
-                'Printer discovery failed (attempt %d/%d): %s - retrying in %.1fs',
-                attempt, cfg.discovery_retry_attempts, e, cfg.discovery_retry_backoff,
+                'Printer discovery failed (attempt %d/%d): %s: %s - retrying in %.1fs',
+                attempt, cfg.discovery_retry_attempts, type(e).__name__, e, cfg.discovery_retry_backoff,
             )
             time.sleep(cfg.discovery_retry_backoff)
 
