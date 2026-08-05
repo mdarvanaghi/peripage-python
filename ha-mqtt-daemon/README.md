@@ -61,15 +61,30 @@ sudo ./ha-mqtt-daemon/install.sh
 
 This sets up a venv at `/opt/peripage-python/.venv`, installs deps (BLE by
 default; pass `--with-classic` too if you need A6/A6+/A40/A40+), creates a
-`peripage` service user with Bluetooth access, copies `peripage-ha.env.example`
-to `peripage-ha.env` if it doesn't already exist, and installs+enables the
-systemd unit (without starting it, since the env file still needs editing).
-See `--help` for `--install-dir`/`--user` overrides. It's safe to re-run.
+`peripage` service user with Bluetooth access, and installs+enables the
+systemd unit. See `--help` for `--install-dir`/`--user` overrides. It's safe
+to re-run (re-running won't re-prompt or touch an existing env file).
 
-Then:
+On a first-time install, if there's no `peripage-ha.env` yet and you're
+running this from a real terminal, it **prompts you for the handful of
+settings that need a decision** (printer type, MAC/BLE address, MQTT broker
+host/port/credentials, concentration) and writes them straight into
+`peripage-ha.env` - everything else keeps its default from
+`peripage-ha.env.example`. Once the resulting config actually validates
+(checked with the daemon's own config loader, not just "non-empty"), **the
+service starts automatically** - no separate "now start it" step.
+
+No terminal attached (e.g. piped from something that isn't an interactive
+shell), or you'd rather configure it yourself? Pass `--non-interactive` and
+it leaves `peripage-ha.env` at the example's blanks:
 ```
+curl -fsSL .../install.sh | sudo bash -s -- --non-interactive
 $EDITOR /opt/peripage-python/ha-mqtt-daemon/peripage-ha.env   # PRINTER_TYPE is required
 sudo systemctl start peripage-ha
+```
+(the installer only skips the auto-start when the config doesn't validate -
+it'll tell you which case you're in either way)
+```
 journalctl -u peripage-ha -f
 ```
 
