@@ -111,6 +111,15 @@ fi
 fetch_repo_tarball() {
     local tmp_dir tarball_url
     tmp_dir="$(mktemp -d)"
+    # mktemp -d defaults to mode 700. `rsync -a` (used below to copy this
+    # into $INSTALL_DIR) preserves permissions, including on the root of the
+    # tree being synced - left at 700, that 700 gets propagated onto
+    # $INSTALL_DIR itself, which then blocks the service user from even
+    # `cd`-ing into it (systemd's WorkingDirectory=, "Permission denied" at
+    # the CHDIR step) despite `chown -R` later making that user the owner -
+    # owning a 700 dir is fine, but by then this 700 has already leaked in
+    # as the actual mode, not just an intermediate state chown would fix.
+    chmod 755 "$tmp_dir"
     tarball_url="${REPO_URL}/archive/${REPO_REF}.tar.gz"
     echo "==> No local checkout found - fetching $tarball_url" >&2
     if command -v curl >/dev/null 2>&1; then
@@ -426,6 +435,12 @@ fi
 
 echo "==> Setting ownership"
 chown -R "$SERVICE_USER:$SERVICE_USER" "$INSTALL_DIR"
+# Belt-and-suspenders alongside the tmp_dir chmod in fetch_repo_tarball():
+# guarantee the top-level directory itself is traversable, regardless of
+# what permissions leaked in via the source of the rsync (tarball fetch) or
+# a pre-existing local checkout. Owning it isn't enough if the mode itself
+# is too restrictive for systemd's WorkingDirectory= CHDIR to succeed.
+chmod 755 "$INSTALL_DIR"
 
 UNIT_PATH="/etc/systemd/system/peripage-ha.service"
 echo "==> Writing $UNIT_PATH"
