@@ -1,0 +1,13 @@
+services:
+  peripage-ha:
+    build:
+      context: ..
+      dockerfile: ha-mqtt-daemon/Dockerfile
+    # Required: BLE/BlueZ needs the host's D-Bus + HCI. See README.md
+    # "Docker (secondary, BLE caveats)" - this is not network-isolated.
+    network_mode: host
+    volumes:
+      - /var/run/dbus:/var/run/dbus
+    env_file:
+      - peripage-ha.env
+    restart: unless-stopped

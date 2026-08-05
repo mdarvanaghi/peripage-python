@@ -1,0 +1,16 @@
+[Unit]
+Description=Peripage Home Assistant MQTT daemon
+After=network-online.target bluetooth.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=peripage
+WorkingDirectory=/opt/peripage-python
+EnvironmentFile=/opt/peripage-python/ha-mqtt-daemon/peripage-ha.env
+ExecStart=/opt/peripage-python/.venv/bin/python -m ha-mqtt-daemon
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

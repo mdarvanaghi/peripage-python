@@ -1,0 +1,10 @@
+# Home Assistant MQTT daemon (ha-mqtt-daemon/). Also requires
+# requirements-ble.txt (for BLE/P21) and/or requirements-classic.txt (for
+# classic Bluetooth A6/A6+/A40/A40+), depending on PRINTER_TRANSPORT.
+-r requirements.txt
+
+# Pinned below 2.0: paho-mqtt 2.x changed callback signatures
+# (on_connect(client, userdata, flags, reason_code, properties) vs 1.x's
+# (client, userdata, flags, rc)). ha-mqtt-daemon/mqtt_bridge.py targets the
+# 1.x signature.
+paho-mqtt>=1.6.0,<2.0.0
