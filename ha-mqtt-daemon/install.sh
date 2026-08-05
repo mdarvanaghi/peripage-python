@@ -170,6 +170,25 @@ REQ_FILES=(-r "$INSTALL_DIR/requirements.txt" -r "$INSTALL_DIR/requirements-ha.t
 echo "==> Installing dependencies"
 "$PIP" install "${REQ_FILES[@]}"
 
+# Install the `peripage` package itself (editable - stays in sync with this
+# checkout, no separate copy of the source to go stale). Without this,
+# `requirements*.txt` alone put the *dependencies* (Pillow, bleak, etc.) on
+# the venv's path but never `peripage` itself, so `python -m peripage...`
+# (used throughout this README/these docs for manual troubleshooting, e.g.
+# `ble_discover`) fails with `ModuleNotFoundError: No module named 'peripage'`
+# even though the daemon itself works fine (__main__.py sys.path.inserts
+# against $INSTALL_DIR directly, bypassing the need for an installed package).
+extras=""
+[ "$WITH_BLE" -eq 1 ] && extras="ble"
+if [ "$WITH_CLASSIC" -eq 1 ]; then
+    [ -n "$extras" ] && extras="${extras},classic" || extras="classic"
+fi
+if [ -n "$extras" ]; then
+    "$PIP" install -e "$INSTALL_DIR[$extras]"
+else
+    "$PIP" install -e "$INSTALL_DIR"
+fi
+
 # -- env file + interactive config -----------------------------------------
 
 ENV_FILE="$INSTALL_DIR/ha-mqtt-daemon/peripage-ha.env"
