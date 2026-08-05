@@ -83,9 +83,19 @@ async def _scan_and_pick(name_filter: str, scan_timeout: float, gatt_timeout: fl
     matches = [d for d in devices if d.name and needle in d.name.lower()]
 
     if not matches:
+        named = [d for d in devices if d.name]
+        if named:
+            seen = ', '.join(f'{d.address} ({d.name})' for d in named[:15])
+            more = f', ... ({len(named) - 15} more)' if len(named) > 15 else ''
+            detail = f'Named devices seen: {seen}{more}.'
+        else:
+            detail = 'None of the scanned devices advertised a name at all.'
         raise DiscoveryError(
             f'No BLE device found matching name filter {name_filter!r} '
-            f'(scanned {len(devices)} device(s)). Is the printer powered on and in range?'
+            f'(scanned {len(devices)} device(s), {len(named)} named). {detail} '
+            'If your printer is in that list under a different name, set '
+            'PRINTER_BLE_ADDRESS to its address (skips the name filter entirely) '
+            'or adjust PRINTER_BLE_NAME_FILTER. Is the printer powered on and in range?'
         )
 
     if len(matches) > 1:
