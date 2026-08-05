@@ -31,8 +31,11 @@ PRINTER_TYPE=P21 PRINTER_TRANSPORT=ble MQTT_HOST=localhost python -m ha-mqtt-dae
 
 If `PRINTER_BLE_ADDRESS`/`PRINTER_BLE_WRITE_UUID` are not set, the daemon
 scans for a nearby BLE device whose advertised name contains
-`PRINTER_BLE_NAME_FILTER` (default `PeriPage`) and auto-picks GATT write/notify
-characteristics. If that's ambiguous or wrong on your setup, run:
+`PRINTER_BLE_NAME_FILTER` (default `PPG` - matches the `PPG_P21_XXXX`-style
+name P21 units actually advertise; older/other units may advertise as
+`PeriPage+XXXX` instead, so adjust the filter if yours doesn't match) and
+auto-picks GATT write/notify characteristics. If that's ambiguous or wrong
+on your setup, run:
 
 ```
 python -m peripage.transport.ble_discover scan
@@ -173,7 +176,7 @@ docker compose logs -f
 | `PRINTER_MAC` | unset | required for `classic` |
 | `PRINTER_TIMEOUT` | `10.0` | seconds |
 | `PRINTER_BLE_ADDRESS` | unset | pins BLE address, skips scan |
-| `PRINTER_BLE_NAME_FILTER` | `PeriPage` | substring match during scan |
+| `PRINTER_BLE_NAME_FILTER` | `PPG` | substring match during scan (case-insensitive) |
 | `PRINTER_BLE_SCAN_TIMEOUT` | `5.0` | seconds |
 | `PRINTER_BLE_WRITE_UUID` / `PRINTER_BLE_NOTIFY_UUID` | unset | pins GATT characteristics, skips auto-pick |
 | `PRINTER_BLE_PREFER_FAST_WRITE` | `false` | |

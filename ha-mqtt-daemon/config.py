@@ -175,7 +175,7 @@ class Config:
             printer_timeout=_env_float('PRINTER_TIMEOUT', 10.0),
 
             ble_address=ble_address,
-            ble_name_filter=_env_str('PRINTER_BLE_NAME_FILTER', 'PeriPage'),
+            ble_name_filter=_env_str('PRINTER_BLE_NAME_FILTER', 'PPG'),
             ble_scan_timeout=_env_float('PRINTER_BLE_SCAN_TIMEOUT', 5.0),
             ble_write_uuid=ble_write_uuid,
             ble_notify_uuid=_env_optional('PRINTER_BLE_NOTIFY_UUID'),

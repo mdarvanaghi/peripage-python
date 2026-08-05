@@ -280,7 +280,7 @@ if [ "$env_file_is_new" -eq 1 ] && [ "$NON_INTERACTIVE" -eq 0 ] && have_tty; the
             echo "Required for classic Bluetooth printers." >&2
         done
     else
-        prompt ble_address "BLE address (blank = auto-discover by scanning for a nearby 'PeriPage' device)"
+        prompt ble_address "BLE address (blank = auto-discover by scanning for a nearby 'PPG' device)"
     fi
 
     prompt mqtt_host "MQTT broker host" "localhost"
