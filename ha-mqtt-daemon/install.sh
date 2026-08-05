@@ -210,22 +210,44 @@ prompt_secret() {
     printf -v "$__var" '%s' "$__answer"
 }
 
-# set_env_var FILE KEY VALUE - uncomments (if needed) and sets KEY=VALUE in
+# set_env_var FILE KEY VALUE - uncomments (if needed) and sets KEY='VALUE' in
 # an existing env file, leaving every other line (including other commented
-# defaults) untouched. Uses awk with -v rather than sed so VALUE (e.g. an
-# MQTT password) doesn't need shell/sed-delimiter escaping.
+# defaults) untouched. The value is always single-quoted (embedded single
+# quotes escaped the standard '\'' way) - both this script's own `source
+# "$ENV_FILE"` (in validate_config) and systemd's EnvironmentFile= actually
+# run this through shell-style word-splitting, so an unquoted value with a
+# space (e.g. the "Peripage P21" device name default) gets parsed as two
+# words - the second one then runs as a command ("P21: command not found").
+# Single-quoting also blocks $-expansion/command substitution of anything
+# a user types in at a prompt (e.g. an MQTT password containing `$` or `` ` ``).
+#
+# Deliberately pure bash, no awk/sed for the substitution itself: awk's `-v`
+# reprocesses backslash escapes in the value it's given, which silently
+# mangles the very '\'' escape this function constructs (turns it into
+# `'''`, corrupting the quoting it just built) - `printf '%s'` never
+# reinterprets its argument, so it's the only safe way to place an
+# already-escaped value onto a line.
 set_env_var() {
-    local file="$1" key="$2" value="$3"
-    awk -v k="$key" -v v="$value" '
-        {
-            line = $0
-            sub(/^#/, "", line)
-            if (line ~ ("^" k "=")) { print k "=" v; done = 1 }
-            else { print $0 }
-        }
-        END { if (!done) print k "=" v }
-    ' "$file" > "$file.tmp"
-    mv "$file.tmp" "$file"
+    local file="$1" key="$2" value="$3" escaped quoted
+    escaped="${value//"'"/"'\\''"}"
+    quoted="'$escaped'"
+
+    local tmp="$file.tmp" line bare found=0
+    : > "$tmp"
+    while IFS= read -r line || [ -n "$line" ]; do
+        bare="${line#\#}"
+        case "$bare" in
+            "$key="*)
+                printf '%s=%s\n' "$key" "$quoted" >> "$tmp"
+                found=1
+                ;;
+            *)
+                printf '%s\n' "$line" >> "$tmp"
+                ;;
+        esac
+    done < "$file"
+    [ "$found" -eq 1 ] || printf '%s=%s\n' "$key" "$quoted" >> "$tmp"
+    mv "$tmp" "$file"
 }
 
 if [ "$env_file_is_new" -eq 1 ] && [ "$NON_INTERACTIVE" -eq 0 ] && have_tty; then
