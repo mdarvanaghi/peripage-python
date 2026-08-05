@@ -53,14 +53,6 @@ One-liner (no clone needed - the script fetches the repo itself):
 curl -fsSL https://raw.githubusercontent.com/mdarvanaghi/peripage-python/main/ha-mqtt-daemon/install.sh | sudo bash
 ```
 
-Testing against a branch that isn't on `main` yet (e.g. this one, before it
-merges) - `bash -s --` is needed to pass flags through a pipe:
-
-```
-curl -fsSL https://raw.githubusercontent.com/mdarvanaghi/peripage-python/feat/ble-support/ha-mqtt-daemon/install.sh \
-  | sudo bash -s -- --ref feat/ble-support
-```
-
 Already have a checkout? The same script detects that and skips the download:
 
 ```
